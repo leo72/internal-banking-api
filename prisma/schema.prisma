@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Employee {
+  id                 String              @id @default(uuid()) @db.Uuid
+  name               String              @db.VarChar(120)
+  apiKeyHash         String              @unique @map("api_key_hash") @db.Char(64)
+  isActive           Boolean             @default(true) @map("is_active")
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  transfers          Transfer[]
+  comments           AccountComment[]
+  locksCreated       AccountLock[]       @relation("LockCreatedBy")
+  locksRemoved       AccountLock[]       @relation("LockRemovedBy")
+  idempotencyRecords IdempotencyRecord[]
+
+  @@map("employees")
+}
+
+model Customer {
+  id        Int       @id
+  name      String    @db.VarChar(120)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  accounts  Account[]
+
+  @@map("customers")
+}
+
+model Account {
+  id                String           @id @default(uuid()) @db.Uuid
+  customerId        Int              @map("customer_id")
+  currency          String           @db.Char(3)
+  balanceMinor      BigInt           @default(0) @map("balance_minor")
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  customer          Customer         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  outgoingTransfers Transfer[]       @relation("TransferSource")
+  incomingTransfers Transfer[]       @relation("TransferDestination")
+  comments          AccountComment[]
+  locks             AccountLock[]
+
+  @@index([customerId])
+  @@map("accounts")
+}
+
+model Transfer {
+  id                      String             @id @default(uuid()) @db.Uuid
+  sourceAccountId         String             @map("source_account_id") @db.Uuid
+  destinationAccountId    String             @map("destination_account_id") @db.Uuid
+  amountMinor             BigInt             @map("amount_minor")
+  currency                String             @db.Char(3)
+  sourceBalanceAfter      BigInt             @map("source_balance_after")
+  destinationBalanceAfter BigInt             @map("destination_balance_after")
+  initiatedByEmployeeId   String             @map("initiated_by_employee_id") @db.Uuid
+  createdAt               DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  sourceAccount           Account            @relation("TransferSource", fields: [sourceAccountId], references: [id], onDelete: Restrict)
+  destinationAccount      Account            @relation("TransferDestination", fields: [destinationAccountId], references: [id], onDelete: Restrict)
+  initiatedByEmployee     Employee           @relation(fields: [initiatedByEmployeeId], references: [id], onDelete: Restrict)
+  idempotencyRecord       IdempotencyRecord?
+
+  @@index([sourceAccountId, createdAt, id])
+  @@index([destinationAccountId, createdAt, id])
+  @@index([initiatedByEmployeeId])
+  @@map("transfers")
+}
+
+model IdempotencyRecord {
+  id             String    @id @default(uuid()) @db.Uuid
+  operation      String    @db.VarChar(64)
+  employeeId     String    @map("employee_id") @db.Uuid
+  keyHash        String    @map("key_hash") @db.Char(64)
+  requestHash    String    @map("request_hash") @db.Char(64)
+  responseStatus Int       @map("response_status")
+  responseBody   Json      @map("response_body")
+  transferId     String?   @unique @map("transfer_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  employee       Employee  @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  transfer       Transfer? @relation(fields: [transferId], references: [id], onDelete: Restrict)
+
+  @@unique([operation, keyHash])
+  @@index([createdAt])
+  @@map("idempotency_records")
+}
+
+model AccountComment {
+  id                  String   @id @default(uuid()) @db.Uuid
+  accountId           String   @map("account_id") @db.Uuid
+  body                String   @db.VarChar(2000)
+  createdByEmployeeId String   @map("created_by_employee_id") @db.Uuid
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  account             Account  @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  createdByEmployee   Employee @relation(fields: [createdByEmployeeId], references: [id], onDelete: Restrict)
+
+  @@index([accountId, createdAt, id])
+  @@index([createdByEmployeeId])
+  @@map("account_comments")
+}
+
+model AccountLock {
+  id                   String    @id @default(uuid()) @db.Uuid
+  accountId            String    @map("account_id") @db.Uuid
+  reason               String    @db.VarChar(500)
+  lockedByEmployeeId   String    @map("locked_by_employee_id") @db.Uuid
+  unlockedByEmployeeId String?   @map("unlocked_by_employee_id") @db.Uuid
+  lockedAt             DateTime  @default(now()) @map("locked_at") @db.Timestamptz(3)
+  unlockedAt           DateTime? @map("unlocked_at") @db.Timestamptz(3)
+  account              Account   @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  lockedByEmployee     Employee  @relation("LockCreatedBy", fields: [lockedByEmployeeId], references: [id], onDelete: Restrict)
+  unlockedByEmployee   Employee? @relation("LockRemovedBy", fields: [unlockedByEmployeeId], references: [id], onDelete: Restrict)
+
+  @@index([accountId, lockedAt, id])
+  @@index([lockedByEmployeeId])
+  @@index([unlockedByEmployeeId])
+  @@map("account_locks")
+}

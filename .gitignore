@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+
+# Generated clients and local environment files
+src/generated/prisma/
+.env
+.env.*
+!.env.example
+
+.DS_Store
