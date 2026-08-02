@@ -4,6 +4,7 @@ import request from "supertest";
 
 import { createApp } from "../../src/app.js";
 import { AppError } from "../../src/errors/app-error.js";
+import type { AccountLockService } from "../../src/modules/account-locks/types/account-lock.types.js";
 import type {
   AccountBalanceResponse,
   AccountResponse,
@@ -27,6 +28,7 @@ const BALANCE_RESPONSE = {
   accountId: ACCOUNT_ID,
   currency: "USD",
   balance: "1000.00",
+  isLocked: false,
 } satisfies AccountBalanceResponse;
 
 const unusedTransferService = {
@@ -37,6 +39,15 @@ const unusedTransferService = {
     return { accountId, transfers: [] };
   },
 } satisfies TransferService;
+
+const unusedAccountLockService = {
+  async lockAccount() {
+    throw new Error("Account lock route is not used by account tests");
+  },
+  async unlockAccount() {
+    throw new Error("Account unlock route is not used by account tests");
+  },
+} satisfies AccountLockService;
 
 const allowAuthenticatedTestRequest: RequestHandler = (
   _request,
@@ -60,6 +71,7 @@ function createAccountTestFixture() {
   } satisfies AccountService;
   const app = createApp({
     apiRouter: createApiRouter({
+      accountLockService: unusedAccountLockService,
       accountService,
       transferService: unusedTransferService,
     }),

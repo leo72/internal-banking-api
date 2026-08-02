@@ -65,8 +65,8 @@ function resolveIdempotencyRecord(
   };
 }
 
-/** Locks both accounts in UUID order to prevent cyclic lock acquisition. */
-async function lockAccounts(
+/** Selects and row-locks both transfer accounts in deterministic UUID order. */
+async function selectTransferAccountsForUpdate(
   transaction: Prisma.TransactionClient,
   sourceAccountId: string,
   destinationAccountId: string,
@@ -147,7 +147,7 @@ async function executeInTransaction(
         );
       }
 
-      const accounts = await lockAccounts(
+      const accounts = await selectTransferAccountsForUpdate(
         transaction,
         command.sourceAccountId,
         command.destinationAccountId,

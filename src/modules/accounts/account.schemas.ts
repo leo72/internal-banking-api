@@ -45,6 +45,7 @@ export const AccountBalanceResponseSchema = Type.Object(
     accountId: Type.String({ pattern: UUID_PATTERN }),
     currency: Type.String({ pattern: CURRENCY_CODE_PATTERN }),
     balance: Type.String({ pattern: MONEY_AMOUNT_PATTERN }),
+    isLocked: Type.Boolean(),
   },
   { additionalProperties: false },
 );

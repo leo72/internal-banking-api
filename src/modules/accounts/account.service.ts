@@ -93,6 +93,11 @@ export function createAccountService(database: DatabaseClient): AccountService {
           id: true,
           currency: true,
           balanceMinor: true,
+          locks: {
+            where: { unlockedAt: null },
+            select: { id: true },
+            take: 1,
+          },
         },
       });
       if (!account) {
@@ -103,6 +108,7 @@ export function createAccountService(database: DatabaseClient): AccountService {
         accountId: account.id,
         currency: account.currency,
         balance: formatMinorUnits(account.balanceMinor),
+        isLocked: account.locks.length > 0,
       };
     },
   };

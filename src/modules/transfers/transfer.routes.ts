@@ -3,6 +3,7 @@ import { Router } from "express";
 
 import { AppError } from "../../errors/app-error.js";
 import { validateRequest } from "../../middleware/validate-request.js";
+import { requireAuthenticatedEmployee } from "../auth/auth.context.js";
 import {
   CreateTransferBodySchema,
   IdempotencyKeySchema,
@@ -44,14 +45,9 @@ export function createTransferRouter(service: TransferService): Router {
     "/transfers",
     validateRequest("body", CreateTransferBodySchema),
     async (request, response) => {
-      const employee = response.locals.employee;
-      if (!employee) {
-        throw new AppError(
-          500,
-          "AUTHENTICATION_CONTEXT_MISSING",
-          "Authenticated employee context is unavailable",
-        );
-      }
+      const employee = requireAuthenticatedEmployee(
+        response.locals.employee,
+      );
       const result = await service.createTransfer({
         ...request.body,
         employeeId: employee.id,

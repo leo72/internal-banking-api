@@ -8,6 +8,7 @@ import { createApp } from "../../src/app.js";
 import { createPrismaClient } from "../../src/db/prisma.js";
 import { hashApiKey } from "../../src/lib/api-key.js";
 import { sha256 } from "../../src/lib/hash.js";
+import { createAccountLockService } from "../../src/modules/account-locks/account-lock.service.js";
 import { createAccountService } from "../../src/modules/accounts/account.service.js";
 import {
   createEmployeeApiKeyLookup,
@@ -42,6 +43,7 @@ if (!databaseUrl) {
 }
 
 const database = createPrismaClient(databaseUrl);
+const accountLockService = createAccountLockService(database);
 const transferRepository = createTransferRepository(database);
 let app: Express;
 
@@ -157,13 +159,14 @@ function postTransfer(
   idempotencyKey: string,
   destinationAccountId: string,
   amount: string,
+  sourceAccountId = SOURCE_ACCOUNT_ID,
 ) {
   return request(app)
     .post("/v1/transfers")
     .set("Authorization", `Bearer ${employeeApiKey}`)
     .set("Idempotency-Key", idempotencyKey)
     .send({
-      sourceAccountId: SOURCE_ACCOUNT_ID,
+      sourceAccountId,
       destinationAccountId,
       amount,
     });
@@ -183,6 +186,7 @@ beforeAll(async () => {
   );
   app = createApp({
     apiRouter: createApiRouter({
+      accountLockService,
       accountService: createAccountService(database),
       transferService,
     }),
@@ -432,5 +436,140 @@ describe("transfer database integration", () => {
     expect(
       await database.transfer.count({ where: testTransferFilter }),
     ).toBe(0);
+  });
+});
+
+describe("account lock database integration", () => {
+  it("records employee attribution when locking and unlocking an account", async () => {
+    const created = await request(app)
+      .post(`/v1/accounts/${SOURCE_ACCOUNT_ID}/locks`)
+      .set("Authorization", `Bearer ${EMPLOYEE_ONE_KEY}`)
+      .send({ reason: "  Manual fraud review  " })
+      .expect(201);
+
+    expect(created.body).toMatchObject({
+      accountId: SOURCE_ACCOUNT_ID,
+      reason: "Manual fraud review",
+      lockedByEmployeeId: EMPLOYEE_ONE_ID,
+      unlockedByEmployeeId: null,
+      unlockedAt: null,
+    });
+    const duplicate = await request(app)
+      .post(`/v1/accounts/${SOURCE_ACCOUNT_ID}/locks`)
+      .set("Authorization", `Bearer ${EMPLOYEE_TWO_KEY}`)
+      .send({ reason: "Duplicate review" })
+      .expect(409);
+    expect(duplicate.body.code).toBe("ACCOUNT_ALREADY_LOCKED");
+    const lockedBalance = await request(app)
+      .get(`/v1/accounts/${SOURCE_ACCOUNT_ID}/balance`)
+      .set("Authorization", `Bearer ${EMPLOYEE_ONE_KEY}`)
+      .expect(200);
+    expect(lockedBalance.body.isLocked).toBe(true);
+
+    await request(app)
+      .delete(`/v1/accounts/${SOURCE_ACCOUNT_ID}/locks`)
+      .set("Authorization", `Bearer ${EMPLOYEE_TWO_KEY}`)
+      .expect(204);
+    await request(app)
+      .delete(`/v1/accounts/${SOURCE_ACCOUNT_ID}/locks`)
+      .set("Authorization", `Bearer ${EMPLOYEE_ONE_KEY}`)
+      .expect(204);
+
+    const storedLock = await database.accountLock.findUniqueOrThrow({
+      where: { id: created.body.id },
+    });
+    expect(storedLock.unlockedByEmployeeId).toBe(EMPLOYEE_TWO_ID);
+    expect(storedLock.unlockedAt).not.toBeNull();
+    const unlockedBalance = await request(app)
+      .get(`/v1/accounts/${SOURCE_ACCOUNT_ID}/balance`)
+      .set("Authorization", `Bearer ${EMPLOYEE_TWO_KEY}`)
+      .expect(200);
+    expect(unlockedBalance.body.isLocked).toBe(false);
+  });
+
+  it("keeps locks isolated between accounts owned by the same customer", async () => {
+    await database.account.update({
+      where: { id: DESTINATION_TWO_ID },
+      data: { balanceMinor: 50_000n },
+    });
+    await request(app)
+      .post(`/v1/accounts/${SOURCE_ACCOUNT_ID}/locks`)
+      .set("Authorization", `Bearer ${EMPLOYEE_ONE_KEY}`)
+      .send({ reason: "Source account review" })
+      .expect(201);
+
+    const blocked = await postTransfer(
+      EMPLOYEE_ONE_KEY,
+      "database-isolation-key-0001",
+      DESTINATION_ONE_ID,
+      "100.00",
+    ).expect(423);
+    const allowed = await postTransfer(
+      EMPLOYEE_TWO_KEY,
+      "database-isolation-key-0002",
+      DESTINATION_ONE_ID,
+      "100.00",
+      DESTINATION_TWO_ID,
+    ).expect(201);
+
+    expect(blocked.body.code).toBe("ACCOUNT_LOCKED");
+    expect(allowed.body.sourceAccountId).toBe(DESTINATION_TWO_ID);
+  });
+
+  it("allows only one concurrent active lock for an account", async () => {
+    const results = await Promise.allSettled([
+      accountLockService.lockAccount({
+        accountId: SOURCE_ACCOUNT_ID,
+        reason: "Employee one review",
+        employeeId: EMPLOYEE_ONE_ID,
+      }),
+      accountLockService.lockAccount({
+        accountId: SOURCE_ACCOUNT_ID,
+        reason: "Employee two review",
+        employeeId: EMPLOYEE_TWO_ID,
+      }),
+    ]);
+
+    expect(results.map((result) => result.status).sort()).toEqual([
+      "fulfilled",
+      "rejected",
+    ]);
+    expect(
+      await database.accountLock.count({
+        where: { accountId: SOURCE_ACCOUNT_ID, unlockedAt: null },
+      }),
+    ).toBe(1);
+  });
+
+  it("serializes a lock racing a transfer into one valid outcome", async () => {
+    const [, transferResult] = await Promise.all([
+      accountLockService.lockAccount({
+        accountId: SOURCE_ACCOUNT_ID,
+        reason: "Concurrent review",
+        employeeId: EMPLOYEE_ONE_ID,
+      }),
+      transferRepository.executeTransfer(
+        createExecutionCommand(
+          SOURCE_ACCOUNT_ID,
+          DESTINATION_ONE_ID,
+          10_000n,
+          EMPLOYEE_TWO_ID,
+          "database-lock-race-key-0001",
+        ),
+      ),
+    ]);
+
+    expect([201, 423]).toContain(transferResult.statusCode);
+    const source = await database.account.findUniqueOrThrow({
+      where: { id: SOURCE_ACCOUNT_ID },
+    });
+    expect(source.balanceMinor).toBe(
+      transferResult.statusCode === 201 ? 140_000n : 150_000n,
+    );
+    expect(
+      await database.accountLock.count({
+        where: { accountId: SOURCE_ACCOUNT_ID, unlockedAt: null },
+      }),
+    ).toBe(1);
   });
 });
