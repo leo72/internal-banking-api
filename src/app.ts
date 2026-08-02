@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type RequestHandler } from "express";
 import helmet from "helmet";
 import type { Logger } from "pino";
 import { pinoHttp } from "pino-http";
@@ -8,15 +8,18 @@ import {
   serializeRequestForLog,
   serializeResponseForLog,
 } from "./lib/logger.js";
+import { errorHandler } from "./middleware/error-handler.js";
 import { healthRouter } from "./modules/health/health.routes.js";
+import { apiRouter } from "./routes/api.routes.js";
 
 export type CreateAppOptions = Readonly<{
+  authenticateEmployee: RequestHandler;
   logger?: Logger;
   nodeEnv?: string;
 }>;
 
 /** Builds the Express application without opening a network listener. */
-export function createApp(options: CreateAppOptions = {}): Express {
+export function createApp(options: CreateAppOptions): Express {
   const app = express();
   const logger = options.logger ?? createLogger(options.nodeEnv ?? "development");
 
@@ -34,6 +37,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
   app.use(express.json({ limit: "100kb" }));
 
   app.use("/health", healthRouter);
+  app.use("/v1", options.authenticateEmployee, apiRouter);
 
   app.use((request, response) => {
     response.status(404).json({
@@ -43,6 +47,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
       path: request.path,
     });
   });
+  app.use(errorHandler);
 
   return app;
 }

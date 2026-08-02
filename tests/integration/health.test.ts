@@ -1,13 +1,27 @@
 import { Writable } from "node:stream";
 
+import type { RequestHandler } from "express";
 import pino from "pino";
 import request from "supertest";
 
 import { createApp } from "../../src/app.js";
 
+const rejectUnexpectedAuthentication: RequestHandler = (
+  _request,
+  _response,
+  next,
+) => {
+  next(new Error("Health routes must not invoke employee authentication"));
+};
+
 describe("health endpoint", () => {
   it("reports that the process is alive", async () => {
-    const response = await request(createApp({ nodeEnv: "test" }))
+    const response = await request(
+      createApp({
+        authenticateEmployee: rejectUnexpectedAuthentication,
+        nodeEnv: "test",
+      }),
+    )
       .get("/health/live")
       .expect(200);
 
@@ -24,7 +38,13 @@ describe("health endpoint", () => {
     });
     const logger = pino({ level: "info" }, destination);
 
-    await request(createApp({ logger, nodeEnv: "test" }))
+    await request(
+      createApp({
+        authenticateEmployee: rejectUnexpectedAuthentication,
+        logger,
+        nodeEnv: "test",
+      }),
+    )
       .get("/health/live?token=query-secret")
       .set("Authorization", "Bearer authorization-secret")
       .set("Cookie", "session=cookie-secret")

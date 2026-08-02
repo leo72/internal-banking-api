@@ -8,5 +8,3 @@ export function createPrismaClient(databaseUrl: string): PrismaClient {
 
   return new PrismaClient({ adapter });
 }
-
-export type DatabaseClient = ReturnType<typeof createPrismaClient>;

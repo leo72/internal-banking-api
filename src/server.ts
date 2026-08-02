@@ -4,6 +4,10 @@ import { createApp } from "./app.js";
 import { parseRuntimeConfig } from "./config/env.js";
 import { createPrismaClient } from "./db/prisma.js";
 import { createLogger } from "./lib/logger.js";
+import {
+  createEmployeeApiKeyLookup,
+  createEmployeeAuthentication,
+} from "./modules/auth/auth.middleware.js";
 
 /** Returns a safe error classification without logging error details. */
 function getErrorName(error: unknown): string {
@@ -18,7 +22,15 @@ async function startServer(): Promise<void> {
 
   await prisma.$connect();
 
-  const app = createApp({ logger, nodeEnv: config.nodeEnv });
+  const authenticateEmployee = createEmployeeAuthentication({
+    apiKeyPepper: config.apiKeyPepper,
+    findEmployeeByApiKeyHash: createEmployeeApiKeyLookup(prisma),
+  });
+  const app = createApp({
+    authenticateEmployee,
+    logger,
+    nodeEnv: config.nodeEnv,
+  });
   const server = app.listen(config.port, () => {
     logger.info({ port: config.port }, "Banking API listening");
   });
