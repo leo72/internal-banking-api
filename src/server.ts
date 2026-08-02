@@ -9,6 +9,9 @@ import {
   createEmployeeApiKeyLookup,
   createEmployeeAuthentication,
 } from "./modules/auth/auth.middleware.js";
+import { InProcessTransferQueue } from "./modules/transfers/transfer.queue.js";
+import { createTransferRepository } from "./modules/transfers/transfer.repository.js";
+import { createTransferService } from "./modules/transfers/transfer.service.js";
 import { createApiRouter } from "./routes/api.routes.js";
 
 /** Returns a safe error classification without logging error details. */
@@ -28,7 +31,13 @@ async function startServer(): Promise<void> {
     apiKeyPepper: config.apiKeyPepper,
     findEmployeeByApiKeyHash: createEmployeeApiKeyLookup(prisma),
   });
-  const apiRouter = createApiRouter(createAccountService(prisma));
+  const apiRouter = createApiRouter({
+    accountService: createAccountService(prisma),
+    transferService: createTransferService(
+      createTransferRepository(prisma),
+      new InProcessTransferQueue(),
+    ),
+  });
   const app = createApp({
     apiRouter,
     authenticateEmployee,

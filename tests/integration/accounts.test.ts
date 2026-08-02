@@ -1,3 +1,4 @@
+import { jest } from "@jest/globals";
 import type { RequestHandler } from "express";
 import request from "supertest";
 
@@ -8,6 +9,7 @@ import type {
   AccountResponse,
   AccountService,
 } from "../../src/modules/accounts/types/account.types.js";
+import type { TransferService } from "../../src/modules/transfers/types/transfer.types.js";
 import { createApiRouter } from "../../src/routes/api.routes.js";
 
 const ACCOUNT_ID = "11111111-1111-4111-8111-111111111111";
@@ -26,6 +28,15 @@ const BALANCE_RESPONSE = {
   currency: "USD",
   balance: "1000.00",
 } satisfies AccountBalanceResponse;
+
+const unusedTransferService = {
+  async createTransfer() {
+    throw new Error("Transfer route is not used by account tests");
+  },
+  async getAccountHistory(accountId) {
+    return { accountId, transfers: [] };
+  },
+} satisfies TransferService;
 
 const allowAuthenticatedTestRequest: RequestHandler = (
   _request,
@@ -48,7 +59,10 @@ function createAccountTestFixture() {
     getAccountBalance,
   } satisfies AccountService;
   const app = createApp({
-    apiRouter: createApiRouter(accountService),
+    apiRouter: createApiRouter({
+      accountService,
+      transferService: unusedTransferService,
+    }),
     authenticateEmployee: allowAuthenticatedTestRequest,
     nodeEnv: "test",
   });

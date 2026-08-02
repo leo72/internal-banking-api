@@ -73,17 +73,17 @@ model Transfer {
 }
 
 model IdempotencyRecord {
-  id             String    @id @default(uuid()) @db.Uuid
-  operation      String    @db.VarChar(64)
-  employeeId     String    @map("employee_id") @db.Uuid
-  keyHash        String    @map("key_hash") @db.Char(64)
-  requestHash    String    @map("request_hash") @db.Char(64)
-  responseStatus Int       @map("response_status")
-  responseBody   Json      @map("response_body")
-  transferId     String?   @unique @map("transfer_id") @db.Uuid
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  employee       Employee  @relation(fields: [employeeId], references: [id], onDelete: Restrict)
-  transfer       Transfer? @relation(fields: [transferId], references: [id], onDelete: Restrict)
+  id                  String    @id @default(uuid()) @db.Uuid
+  operation           String    @db.VarChar(64)
+  createdByEmployeeId String    @map("created_by_employee_id") @db.Uuid
+  keyHash             String    @map("key_hash") @db.Char(64)
+  requestHash         String    @map("request_hash") @db.Char(64)
+  responseStatus      Int       @map("response_status")
+  responseBody        Json      @map("response_body")
+  transferId          String?   @unique @map("transfer_id") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdByEmployee   Employee  @relation(fields: [createdByEmployeeId], references: [id], onDelete: Restrict)
+  transfer            Transfer? @relation(fields: [transferId], references: [id], onDelete: Restrict)
 
   @@unique([operation, keyHash])
   @@index([createdAt])

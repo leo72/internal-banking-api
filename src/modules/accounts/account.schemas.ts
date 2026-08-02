@@ -1,9 +1,10 @@
 import { Type } from "@sinclair/typebox";
 
 import { MONEY_AMOUNT_PATTERN } from "../../lib/money.js";
-
-const UUID_PATTERN =
-  "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$";
+import {
+  CURRENCY_CODE_PATTERN,
+  UUID_PATTERN,
+} from "../../lib/validation-patterns.js";
 
 export const CustomerAccountParamsSchema = Type.Object(
   {
@@ -21,7 +22,7 @@ export const AccountIdParamsSchema = Type.Object(
 
 export const CreateAccountBodySchema = Type.Object(
   {
-    currency: Type.String({ pattern: "^[A-Z]{3}$" }),
+    currency: Type.String({ pattern: CURRENCY_CODE_PATTERN }),
     initialDeposit: Type.String({ pattern: MONEY_AMOUNT_PATTERN }),
   },
   { additionalProperties: false },
@@ -31,7 +32,7 @@ export const AccountResponseSchema = Type.Object(
   {
     id: Type.String({ pattern: UUID_PATTERN }),
     customerId: Type.Integer(),
-    currency: Type.String({ pattern: "^[A-Z]{3}$" }),
+    currency: Type.String({ pattern: CURRENCY_CODE_PATTERN }),
     initialDeposit: Type.String({ pattern: MONEY_AMOUNT_PATTERN }),
     balance: Type.String({ pattern: MONEY_AMOUNT_PATTERN }),
     createdAt: Type.String(),
@@ -42,7 +43,7 @@ export const AccountResponseSchema = Type.Object(
 export const AccountBalanceResponseSchema = Type.Object(
   {
     accountId: Type.String({ pattern: UUID_PATTERN }),
-    currency: Type.String({ pattern: "^[A-Z]{3}$" }),
+    currency: Type.String({ pattern: CURRENCY_CODE_PATTERN }),
     balance: Type.String({ pattern: MONEY_AMOUNT_PATTERN }),
   },
   { additionalProperties: false },

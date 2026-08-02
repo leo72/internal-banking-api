@@ -3,6 +3,7 @@ import {
   formatMinorUnits,
   parseMoneyToMinorUnits,
 } from "../../lib/money.js";
+import { CURRENCY_CODE_PATTERN } from "../../lib/validation-patterns.js";
 import type { DatabaseClient } from "../../types/database.types.js";
 import type {
   AccountService,
@@ -10,7 +11,7 @@ import type {
 } from "./types/account.types.js";
 
 const MAX_POSTGRES_INTEGER = 2_147_483_647;
-const CURRENCY_PATTERN = /^[A-Z]{3}$/;
+const CURRENCY_PATTERN = new RegExp(CURRENCY_CODE_PATTERN);
 
 /** Converts a validated account-opening amount into minor units. */
 function parseInitialDeposit(initialDeposit: string): bigint {
