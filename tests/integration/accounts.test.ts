@@ -4,6 +4,7 @@ import request from "supertest";
 
 import { createApp } from "../../src/app.js";
 import { AppError } from "../../src/errors/app-error.js";
+import type { AccountCommentService } from "../../src/modules/account-comments/types/account-comment.types.js";
 import type { AccountLockService } from "../../src/modules/account-locks/types/account-lock.types.js";
 import type {
   AccountBalanceResponse,
@@ -49,6 +50,12 @@ const unusedAccountLockService = {
   },
 } satisfies AccountLockService;
 
+const unusedAccountCommentService = {
+  async createComment() {
+    throw new Error("Account comment route is not used by account tests");
+  },
+} satisfies AccountCommentService;
+
 const allowAuthenticatedTestRequest: RequestHandler = (
   _request,
   response,
@@ -71,6 +78,7 @@ function createAccountTestFixture() {
   } satisfies AccountService;
   const app = createApp({
     apiRouter: createApiRouter({
+      accountCommentService: unusedAccountCommentService,
       accountLockService: unusedAccountLockService,
       accountService,
       transferService: unusedTransferService,

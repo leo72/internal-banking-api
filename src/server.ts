@@ -4,6 +4,7 @@ import { createApp } from "./app.js";
 import { parseRuntimeConfig } from "./config/env.js";
 import { createPrismaClient } from "./db/prisma.js";
 import { createLogger } from "./lib/logger.js";
+import { createAccountCommentService } from "./modules/account-comments/account-comment.service.js";
 import { createAccountLockService } from "./modules/account-locks/account-lock.service.js";
 import { createAccountService } from "./modules/accounts/account.service.js";
 import {
@@ -33,6 +34,7 @@ async function startServer(): Promise<void> {
     findEmployeeByApiKeyHash: createEmployeeApiKeyLookup(prisma),
   });
   const apiRouter = createApiRouter({
+    accountCommentService: createAccountCommentService(prisma),
     accountLockService: createAccountLockService(prisma),
     accountService: createAccountService(prisma),
     transferService: createTransferService(

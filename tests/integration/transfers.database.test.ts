@@ -8,6 +8,7 @@ import { createApp } from "../../src/app.js";
 import { createPrismaClient } from "../../src/db/prisma.js";
 import { hashApiKey } from "../../src/lib/api-key.js";
 import { sha256 } from "../../src/lib/hash.js";
+import { createAccountCommentService } from "../../src/modules/account-comments/account-comment.service.js";
 import { createAccountLockService } from "../../src/modules/account-locks/account-lock.service.js";
 import { createAccountService } from "../../src/modules/accounts/account.service.js";
 import {
@@ -43,6 +44,7 @@ if (!databaseUrl) {
 }
 
 const database = createPrismaClient(databaseUrl);
+const accountCommentService = createAccountCommentService(database);
 const accountLockService = createAccountLockService(database);
 const transferRepository = createTransferRepository(database);
 let app: Express;
@@ -186,6 +188,7 @@ beforeAll(async () => {
   );
   app = createApp({
     apiRouter: createApiRouter({
+      accountCommentService,
       accountLockService,
       accountService: createAccountService(database),
       transferService,
@@ -571,5 +574,54 @@ describe("account lock database integration", () => {
         where: { accountId: SOURCE_ACCOUNT_ID, unlockedAt: null },
       }),
     ).toBe(1);
+  });
+});
+
+describe("account comment database integration", () => {
+  it("keeps employee-attributed comments isolated to their accounts", async () => {
+    const sourceComment = await request(app)
+      .post(`/v1/accounts/${SOURCE_ACCOUNT_ID}/comments`)
+      .set("Authorization", `Bearer ${EMPLOYEE_ONE_KEY}`)
+      .send({ body: "  Source account review note  " })
+      .expect(201);
+    const destinationComment = await request(app)
+      .post(`/v1/accounts/${DESTINATION_TWO_ID}/comments`)
+      .set("Authorization", `Bearer ${EMPLOYEE_TWO_KEY}`)
+      .send({ body: "Destination account review note" })
+      .expect(201);
+
+    expect(sourceComment.body).toMatchObject({
+      accountId: SOURCE_ACCOUNT_ID,
+      body: "Source account review note",
+      createdByEmployeeId: EMPLOYEE_ONE_ID,
+    });
+    expect(destinationComment.body).toMatchObject({
+      accountId: DESTINATION_TWO_ID,
+      body: "Destination account review note",
+      createdByEmployeeId: EMPLOYEE_TWO_ID,
+    });
+
+    const sourceComments = await database.accountComment.findMany({
+      where: { accountId: SOURCE_ACCOUNT_ID },
+    });
+    const destinationComments = await database.accountComment.findMany({
+      where: { accountId: DESTINATION_TWO_ID },
+    });
+    expect(sourceComments).toHaveLength(1);
+    expect(sourceComments[0]?.createdByEmployeeId).toBe(EMPLOYEE_ONE_ID);
+    expect(destinationComments).toHaveLength(1);
+    expect(destinationComments[0]?.createdByEmployeeId).toBe(
+      EMPLOYEE_TWO_ID,
+    );
+  });
+
+  it("rejects comments for an account that does not exist", async () => {
+    const response = await request(app)
+      .post("/v1/accounts/a0000000-0000-4000-8000-999999999999/comments")
+      .set("Authorization", `Bearer ${EMPLOYEE_ONE_KEY}`)
+      .send({ body: "Unattached review note" })
+      .expect(404);
+
+    expect(response.body.code).toBe("ACCOUNT_NOT_FOUND");
   });
 });
