@@ -1,0 +1,82 @@
+name: internal-banking-api
+
+x-database-url: &database-url >-
+  postgresql://banking:${POSTGRES_PASSWORD:-banking-local-only}@database:5432/banking?schema=public
+
+services:
+  database:
+    image: postgres:17.6-bookworm
+    environment:
+      POSTGRES_DB: banking
+      POSTGRES_USER: banking
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-banking-local-only}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U banking -d banking"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    volumes:
+      - banking-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  migration:
+    build:
+      context: .
+      target: tools
+    command: ["npm", "run", "db:migrate:deploy"]
+    environment:
+      DATABASE_URL: *database-url
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      target: runtime
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: *database-url
+      API_KEY_PEPPER: ${API_KEY_PEPPER:?API_KEY_PEPPER must be set}
+    depends_on:
+      database:
+        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
+    ports:
+      - "${PORT:-3000}:3000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  seed:
+    profiles: ["seed"]
+    build:
+      context: .
+      target: tools
+    command: ["npm", "run", "db:seed"]
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: *database-url
+      API_KEY_PEPPER: ${API_KEY_PEPPER:?API_KEY_PEPPER must be set}
+      SEED_EMPLOYEE_1_API_KEY: ${SEED_EMPLOYEE_1_API_KEY:-}
+      SEED_EMPLOYEE_2_API_KEY: ${SEED_EMPLOYEE_2_API_KEY:-}
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+    restart: "no"
+
+volumes:
+  banking-data:
