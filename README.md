@@ -68,6 +68,26 @@ All `/v1` endpoints require an employee API key in the
 - `POST /v1/accounts/:accountId/locks` — Lock an account with a free-text reason.
 - `DELETE /v1/accounts/:accountId/locks` — Idempotently remove the active account lock.
 
+### Transfer Queue
+
+Transfers pass through an in-process FIFO queue and are handled one at a time
+within each API process. The queue is not durable or shared between multiple
+API instances; correctness remains protected independently by PostgreSQL
+transactions, idempotency constraints, and deterministic account-row locking.
+
+A larger asynchronous system could persist transfer requests in a database
+queue and use separate workers to claim and process them. That design improves
+durability and multi-instance coordination, but also requires job states,
+retries, crash recovery, and asynchronous status handling, so it is outside
+this assignment's core scope.
+
+### API Documentation
+
+This README provides a concise route overview. For a larger production API,
+OpenAPI with Swagger UI would provide better interactive documentation,
+request and response examples, and a machine-readable contract. The existing
+TypeBox schemas could be reused when adding an OpenAPI specification.
+
 ## Running with Docker
 
 Build and start the API, migration service, and PostgreSQL:
