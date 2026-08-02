@@ -54,6 +54,20 @@ cp .env.example .env
 The values in `.env.example` are for local development only. Replace all
 credentials before using the application in another environment.
 
+## API Endpoints
+
+All `/v1` endpoints require an employee API key in the
+`Authorization: Bearer <api-key>` header. The health endpoint is public.
+
+- `GET /health/live` — Check whether the application is running.
+- `POST /v1/customers/:customerId/accounts` — Create an account with an initial deposit.
+- `GET /v1/accounts/:accountId/balance` — Retrieve the account balance and lock status.
+- `POST /v1/transfers` — Submit a transfer using a required `Idempotency-Key` header.
+- `GET /v1/accounts/:accountId/transfers` — Retrieve incoming and outgoing transfer history.
+- `POST /v1/accounts/:accountId/comments` — Add an employee-attributed internal comment.
+- `POST /v1/accounts/:accountId/locks` — Lock an account with a free-text reason.
+- `DELETE /v1/accounts/:accountId/locks` — Idempotently remove the active account lock.
+
 ## Running with Docker
 
 Build and start the API, migration service, and PostgreSQL:
