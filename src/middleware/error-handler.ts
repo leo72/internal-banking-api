@@ -1,5 +1,7 @@
 import type { ErrorRequestHandler } from "express";
 
+import { AppError } from "../errors/app-error.js";
+
 /** Logs a safe error classification and returns a generic JSON response. */
 export const errorHandler: ErrorRequestHandler = (
   error: unknown,
@@ -9,6 +11,16 @@ export const errorHandler: ErrorRequestHandler = (
 ) => {
   if (response.headersSent) {
     next(error);
+    return;
+  }
+
+  if (error instanceof AppError) {
+    response.status(error.statusCode).json({
+      status: error.statusCode,
+      code: error.code,
+      message: error.message,
+      ...(error.details === undefined ? {} : { details: error.details }),
+    });
     return;
   }
 

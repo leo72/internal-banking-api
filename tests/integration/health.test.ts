@@ -1,6 +1,6 @@
 import { Writable } from "node:stream";
 
-import type { RequestHandler } from "express";
+import { Router, type RequestHandler } from "express";
 import pino from "pino";
 import request from "supertest";
 
@@ -18,6 +18,7 @@ describe("health endpoint", () => {
   it("reports that the process is alive", async () => {
     const response = await request(
       createApp({
+        apiRouter: Router(),
         authenticateEmployee: rejectUnexpectedAuthentication,
         nodeEnv: "test",
       }),
@@ -40,6 +41,7 @@ describe("health endpoint", () => {
 
     await request(
       createApp({
+        apiRouter: Router(),
         authenticateEmployee: rejectUnexpectedAuthentication,
         logger,
         nodeEnv: "test",

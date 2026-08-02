@@ -4,10 +4,12 @@ import { createApp } from "./app.js";
 import { parseRuntimeConfig } from "./config/env.js";
 import { createPrismaClient } from "./db/prisma.js";
 import { createLogger } from "./lib/logger.js";
+import { createAccountService } from "./modules/accounts/account.service.js";
 import {
   createEmployeeApiKeyLookup,
   createEmployeeAuthentication,
 } from "./modules/auth/auth.middleware.js";
+import { createApiRouter } from "./routes/api.routes.js";
 
 /** Returns a safe error classification without logging error details. */
 function getErrorName(error: unknown): string {
@@ -26,7 +28,9 @@ async function startServer(): Promise<void> {
     apiKeyPepper: config.apiKeyPepper,
     findEmployeeByApiKeyHash: createEmployeeApiKeyLookup(prisma),
   });
+  const apiRouter = createApiRouter(createAccountService(prisma));
   const app = createApp({
+    apiRouter,
     authenticateEmployee,
     logger,
     nodeEnv: config.nodeEnv,

@@ -34,17 +34,18 @@ model Customer {
 }
 
 model Account {
-  id                String           @id @default(uuid()) @db.Uuid
-  customerId        Int              @map("customer_id")
-  currency          String           @db.Char(3)
-  balanceMinor      BigInt           @default(0) @map("balance_minor")
-  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
-  customer          Customer         @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  outgoingTransfers Transfer[]       @relation("TransferSource")
-  incomingTransfers Transfer[]       @relation("TransferDestination")
-  comments          AccountComment[]
-  locks             AccountLock[]
+  id                  String           @id @default(uuid()) @db.Uuid
+  customerId          Int              @map("customer_id")
+  currency            String           @db.Char(3)
+  initialDepositMinor BigInt           @default(0) @map("initial_deposit_minor")
+  balanceMinor        BigInt           @default(0) @map("balance_minor")
+  createdAt           DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  customer            Customer         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  outgoingTransfers   Transfer[]       @relation("TransferSource")
+  incomingTransfers   Transfer[]       @relation("TransferDestination")
+  comments            AccountComment[]
+  locks               AccountLock[]
 
   @@index([customerId])
   @@map("accounts")

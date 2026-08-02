@@ -129,7 +129,11 @@ describe("employee authentication", () => {
 
   it("keeps health public and protects every version-one route", async () => {
     const { authenticateEmployee } = createAuthenticationFixture();
-    const app = createApp({ authenticateEmployee, nodeEnv: "test" });
+    const app = createApp({
+      apiRouter: express.Router(),
+      authenticateEmployee,
+      nodeEnv: "test",
+    });
 
     await request(app).get("/health/live").expect(200);
     await request(app).get("/v1/accounts").expect(401);
@@ -146,7 +150,11 @@ describe("employee authentication", () => {
         throw new Error("sensitive database details");
       },
     });
-    const app = createApp({ authenticateEmployee, nodeEnv: "test" });
+    const app = createApp({
+      apiRouter: express.Router(),
+      authenticateEmployee,
+      nodeEnv: "test",
+    });
 
     const response = await request(app)
       .get("/v1/accounts")

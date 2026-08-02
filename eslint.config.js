@@ -12,6 +12,11 @@ export default tseslint.config(
     rules: {
       "@typescript-eslint/consistent-type-imports": "error",
       "@typescript-eslint/no-explicit-any": "error",
+      curly: ["error", "all"],
+      eqeqeq: ["error", "always"],
+      "no-console": "error",
+      "no-duplicate-imports": "error",
+      "object-shorthand": "error",
     },
   },
 );
