@@ -24,6 +24,8 @@ The API is intended for authenticated bank employees and supports account creati
 - Unit and integration tests with Jest and Supertest
 - Docker and Docker Compose support
 
+
+
 ## Technology
 
 - Node.js
@@ -37,11 +39,15 @@ The API is intended for authenticated bank employees and supports account creati
 - Pino
 - Docker
 
+
+
 ## Requirements
 
 - Node.js 22+
 - npm
 - Docker and Docker Compose
+
+
 
 ## Configuration
 
@@ -67,6 +73,8 @@ All `/v1` endpoints require an employee API key in the
 - `POST /v1/accounts/:accountId/comments` — Add an employee-attributed internal comment.
 - `POST /v1/accounts/:accountId/locks` — Lock an account with a free-text reason.
 - `DELETE /v1/accounts/:accountId/locks` — Idempotently remove the active account lock.
+
+
 
 ### Transfer Queue
 
@@ -102,7 +110,7 @@ Seed the example customers and employees:
 docker compose run --rm seed
 ```
 
-The API is available at <http://localhost:3000>.
+The API is available at [http://localhost:3000](http://localhost:3000).
 
 Check application health:
 
@@ -121,6 +129,8 @@ To also remove the PostgreSQL volume and all stored data:
 ```bash
 docker compose down --volumes
 ```
+
+
 
 ## Running Locally
 
@@ -157,4 +167,8 @@ Start the development server:
 npm run dev
 ```
 
-The development API is available at <http://localhost:3000>.
+The development API is available at [http://localhost:3000](http://localhost:3000).
+
+
+
+See the [TASK.md](TASK.md) file for the tsk itself.
