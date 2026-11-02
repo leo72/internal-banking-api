@@ -102,6 +102,7 @@ describe("health endpoint", () => {
       .get("/health/ready")
       .expect(503);
 
+    expect(response.headers["retry-after"]).toBe("1");
     expect(response.body.code).toBe("SERVICE_UNAVAILABLE");
   });
 

@@ -44,4 +44,24 @@ describe("InProcessTransferQueue", () => {
     await expect(failed).rejects.toThrow("expected failure");
     await expect(succeeding).resolves.toBe("completed");
   });
+
+  it("rejects additional work when the queue is at capacity", async () => {
+    const queue = new InProcessTransferQueue(1);
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const first = queue.enqueue(async () => {
+      await gate;
+      return "first";
+    });
+
+    expect(() => queue.enqueue(async () => "second")).toThrow(
+      "Transfer processing is at capacity, retry shortly",
+    );
+
+    release?.();
+    await expect(first).resolves.toBe("first");
+    await expect(queue.enqueue(async () => "third")).resolves.toBe("third");
+  });
 });

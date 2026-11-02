@@ -33,6 +33,10 @@ export const errorHandler: ErrorRequestHandler = (
   }
 
   if (error instanceof AppError) {
+    if (error.statusCode === 503) {
+      response.set("Retry-After", "1");
+    }
+
     response.status(error.statusCode).json({
       status: error.statusCode,
       code: error.code,
