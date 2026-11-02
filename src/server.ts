@@ -1,5 +1,7 @@
 import "dotenv/config";
 
+import { createServer, type Server } from "node:http";
+
 import { createApp } from "./app.js";
 import { parseRuntimeConfig } from "./config/env.js";
 import { createPrismaClient } from "./db/prisma.js";
@@ -17,9 +19,32 @@ import { createTransferRepository } from "./modules/transfers/transfer.repositor
 import { createTransferService } from "./modules/transfers/transfer.service.js";
 import { createApiRouter } from "./routes/api.routes.js";
 
+const HTTP_REQUEST_TIMEOUT_MS = 30_000;
+const HTTP_HEADERS_TIMEOUT_MS = 35_000;
+const HTTP_KEEP_ALIVE_TIMEOUT_MS = 5_000;
+const SHUTDOWN_TIMEOUT_MS = 20_000;
+
 /** Returns a safe error classification without logging error details. */
 function getErrorName(error: unknown): string {
   return error instanceof Error ? error.name : "UnknownError";
+}
+
+/** Waits until the HTTP server is listening or fails to bind. */
+function listen(server: Server, port: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const onError = (error: Error): void => {
+      server.off("listening", onListening);
+      reject(error);
+    };
+    const onListening = (): void => {
+      server.off("error", onError);
+      resolve();
+    };
+
+    server.once("error", onError);
+    server.once("listening", onListening);
+    server.listen(port);
+  });
 }
 
 /** Connects dependencies, starts HTTP listening, and registers shutdown hooks. */
@@ -64,9 +89,17 @@ async function startServer(): Promise<void> {
     logger,
     nodeEnv: config.nodeEnv,
   });
-  const server = app.listen(config.port, () => {
-    logger.info({ port: config.port }, "Banking API listening");
-  });
+  const server = createServer(app);
+  server.requestTimeout = HTTP_REQUEST_TIMEOUT_MS;
+  server.headersTimeout = HTTP_HEADERS_TIMEOUT_MS;
+  server.keepAliveTimeout = HTTP_KEEP_ALIVE_TIMEOUT_MS;
+  try {
+    await listen(server, config.port);
+  } catch (error: unknown) {
+    await prisma.$disconnect();
+    throw error;
+  }
+  logger.info({ port: config.port }, "Banking API listening");
 
   let isShuttingDown = false;
 
@@ -79,27 +112,37 @@ async function startServer(): Promise<void> {
     isShuttingDown = true;
     logger.info({ signal }, "Shutting down banking API");
 
-    await new Promise<void>((resolve, reject) => {
-      server.close((error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve();
+    const timeout = setTimeout(() => {
+      logger.error({ signal }, "Graceful shutdown timed out");
+      process.exit(1);
+    }, SHUTDOWN_TIMEOUT_MS);
+    timeout.unref();
+
+    try {
+      server.closeIdleConnections();
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve();
+        });
       });
-    });
-    await prisma.$disconnect();
+      await prisma.$disconnect();
+      process.exit(0);
+    } catch (error: unknown) {
+      logger.error(
+        { errorName: getErrorName(error), signal },
+        "Graceful shutdown failed",
+      );
+      process.exit(1);
+    }
   };
 
   for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.once(signal, () => {
-      void shutdown(signal).catch((error: unknown) => {
-        logger.error(
-          { errorName: getErrorName(error), signal },
-          "Graceful shutdown failed",
-        );
-        process.exitCode = 1;
-      });
+      void shutdown(signal);
     });
   }
 }
@@ -110,5 +153,5 @@ void startServer().catch((error: unknown) => {
     { errorName: getErrorName(error) },
     "Banking API failed to start",
   );
-  process.exitCode = 1;
+  process.exit(1);
 });
