@@ -104,4 +104,20 @@ describe("health endpoint", () => {
 
     expect(response.body.code).toBe("SERVICE_UNAVAILABLE");
   });
+
+  it("rejects malformed JSON with a client error", async () => {
+    const response = await request(
+      createApp({
+        apiRouter: Router(),
+        authenticateEmployee: rejectUnexpectedAuthentication,
+        nodeEnv: "test",
+      }),
+    )
+      .post("/v1/transfers")
+      .set("Content-Type", "application/json")
+      .send("{")
+      .expect(400);
+
+    expect(response.body.code).toBe("INVALID_JSON");
+  });
 });

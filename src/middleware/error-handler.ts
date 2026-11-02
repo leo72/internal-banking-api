@@ -2,6 +2,15 @@ import type { ErrorRequestHandler } from "express";
 
 import { AppError } from "../errors/app-error.js";
 
+/** Detects Express JSON body-parser failures without exposing the raw payload. */
+function isJsonSyntaxError(error: unknown): boolean {
+  return (
+    error instanceof SyntaxError &&
+    "type" in error &&
+    error.type === "entity.parse.failed"
+  );
+}
+
 /** Logs a safe error classification and returns a generic JSON response. */
 export const errorHandler: ErrorRequestHandler = (
   error: unknown,
@@ -11,6 +20,15 @@ export const errorHandler: ErrorRequestHandler = (
 ) => {
   if (response.headersSent) {
     next(error);
+    return;
+  }
+
+  if (isJsonSyntaxError(error)) {
+    response.status(400).json({
+      status: 400,
+      code: "INVALID_JSON",
+      message: "Request body must be valid JSON",
+    });
     return;
   }
 
