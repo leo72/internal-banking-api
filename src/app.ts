@@ -8,7 +8,7 @@ import {
   serializeResponseForLog,
 } from "./lib/logger.js";
 import { errorHandler } from "./middleware/error-handler.js";
-import { healthRouter } from "./modules/health/health.routes.js";
+import { createHealthRouter } from "./modules/health/health.routes.js";
 import type { CreateAppOptions } from "./types/app.types.js";
 
 /** Builds the Express application without opening a network listener. */
@@ -29,7 +29,7 @@ export function createApp(options: CreateAppOptions): Express {
   );
   app.use(express.json({ limit: "100kb" }));
 
-  app.use("/health", healthRouter);
+  app.use("/health", createHealthRouter(options.checkReadiness));
   app.use("/v1", options.authenticateEmployee, options.apiRouter);
 
   app.use((request, response) => {

@@ -65,7 +65,8 @@ credentials before using the application in another environment.
 All `/v1` endpoints require an employee API key in the
 `Authorization: Bearer <api-key>` header. The health endpoint is public.
 
-- `GET /health/live` — Check whether the application is running.
+- `GET /health/live` — Check whether the application process is running.
+- `GET /health/ready` — Check whether the application can reach PostgreSQL.
 - `POST /v1/customers/:customerId/accounts` — Create an account with an initial deposit.
 - `GET /v1/accounts/:accountId/balance` — Retrieve the account balance and lock status.
 - `POST /v1/transfers` — Submit a transfer using a required `Idempotency-Key` header.

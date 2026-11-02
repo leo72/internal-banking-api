@@ -5,6 +5,7 @@ import type { Logger } from "pino";
 export type CreateAppOptions = Readonly<{
   apiRouter: RequestHandler;
   authenticateEmployee: RequestHandler;
+  checkReadiness?: () => Promise<void>;
   logger?: Logger;
   nodeEnv?: string;
 }>;

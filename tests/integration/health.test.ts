@@ -1,10 +1,12 @@
 import { Writable } from "node:stream";
 
+import { jest } from "@jest/globals";
 import { Router, type RequestHandler } from "express";
 import pino from "pino";
 import request from "supertest";
 
 import { createApp } from "../../src/app.js";
+import { AppError } from "../../src/errors/app-error.js";
 
 const rejectUnexpectedAuthentication: RequestHandler = (
   _request,
@@ -63,5 +65,43 @@ describe("health endpoint", () => {
     expect(logOutput).not.toContain("cookie-secret");
     expect(logOutput).not.toContain("private-user-agent");
     expect(logOutput).not.toContain('"headers"');
+  });
+
+  it("reports readiness after a successful dependency check", async () => {
+    const checkReadiness = jest.fn(async () => undefined);
+    const response = await request(
+      createApp({
+        apiRouter: Router(),
+        authenticateEmployee: rejectUnexpectedAuthentication,
+        checkReadiness,
+        nodeEnv: "test",
+      }),
+    )
+      .get("/health/ready")
+      .expect(200);
+
+    expect(response.body).toEqual({ status: "ok" });
+    expect(checkReadiness).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports unreadiness when the dependency check fails", async () => {
+    const response = await request(
+      createApp({
+        apiRouter: Router(),
+        authenticateEmployee: rejectUnexpectedAuthentication,
+        checkReadiness: async () => {
+          throw new AppError(
+            503,
+            "SERVICE_UNAVAILABLE",
+            "Database is unavailable",
+          );
+        },
+        nodeEnv: "test",
+      }),
+    )
+      .get("/health/ready")
+      .expect(503);
+
+    expect(response.body.code).toBe("SERVICE_UNAVAILABLE");
   });
 });

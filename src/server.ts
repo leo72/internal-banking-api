@@ -3,6 +3,7 @@ import "dotenv/config";
 import { createApp } from "./app.js";
 import { parseRuntimeConfig } from "./config/env.js";
 import { createPrismaClient } from "./db/prisma.js";
+import { AppError } from "./errors/app-error.js";
 import { createLogger } from "./lib/logger.js";
 import { createAccountCommentService } from "./modules/account-comments/account-comment.service.js";
 import { createAccountLockService } from "./modules/account-locks/account-lock.service.js";
@@ -45,6 +46,21 @@ async function startServer(): Promise<void> {
   const app = createApp({
     apiRouter,
     authenticateEmployee,
+    checkReadiness: async () => {
+      try {
+        await prisma.$queryRaw`SELECT 1`;
+      } catch (error: unknown) {
+        logger.error(
+          { errorName: getErrorName(error) },
+          "Readiness check failed",
+        );
+        throw new AppError(
+          503,
+          "SERVICE_UNAVAILABLE",
+          "Database is unavailable",
+        );
+      }
+    },
     logger,
     nodeEnv: config.nodeEnv,
   });
