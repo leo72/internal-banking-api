@@ -1,4 +1,4 @@
-import type { Prisma } from "../../generated/prisma/client.js";
+import { Prisma } from "../../generated/prisma/client.js";
 import { AppError } from "../../errors/app-error.js";
 import { UUID_PATTERN } from "../../lib/validation-patterns.js";
 import type { DatabaseClient } from "../../types/database.types.js";
@@ -91,14 +91,28 @@ export function createAccountLockService(
           );
         }
 
-        const lock = await transaction.accountLock.create({
-          data: {
-            accountId: account.id,
-            reason: command.reason,
-            lockedByEmployeeId: command.employeeId,
-          },
-        });
-        return mapAccountLock(lock);
+        try {
+          const lock = await transaction.accountLock.create({
+            data: {
+              accountId: account.id,
+              reason: command.reason,
+              lockedByEmployeeId: command.employeeId,
+            },
+          });
+          return mapAccountLock(lock);
+        } catch (error: unknown) {
+          if (
+            error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === "P2002"
+          ) {
+            throw new AppError(
+              409,
+              "ACCOUNT_ALREADY_LOCKED",
+              "Account already has an active lock",
+            );
+          }
+          throw error;
+        }
       });
     },
 
